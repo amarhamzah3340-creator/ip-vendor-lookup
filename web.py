@@ -124,6 +124,38 @@ def connect_router(router_id):
         if active_collector is not None:
             active_collector.stop()
 
+
+@app.route("/routers")
+def get_routers():
+    refresh_config()
+    return jsonify([
+        {"id": r["id"], "name": r["name"], "ip": r["ip"]}
+        for r in routers
+    ])
+
+
+@app.route("/vendors")
+def get_vendors():
+    refresh_config()
+    return jsonify(sorted({v for v in oui_map.values() if v}))
+
+
+@app.route("/connect/<router_id>", methods=["POST"])
+def connect_router(router_id):
+    global active_router_id, active_collector
+
+    refresh_config()
+    router = router_map.get(router_id)
+    if not router:
+        return jsonify({"success": False, "message": "Router not found"}), 404
+
+    with collector_lock:
+        if active_router_id == router_id and active_collector is not None:
+            return jsonify({"success": True, "message": f"Already connected to {router_id}"})
+
+        if active_collector is not None:
+            active_collector.stop()
+
         active_collector = RouterCollector(router, poll_interval=poll_interval, oui_map=oui_map, log_callback=log)
         active_collector.start()
         active_router_id = router_id
