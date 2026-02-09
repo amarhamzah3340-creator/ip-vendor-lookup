@@ -154,12 +154,6 @@ thead, tbody tr {
 tbody tr:hover { background: rgba(255,255,255,0.04); }
 tr.checked { background: rgba(20,25,60,0.85); }
 tr.offline { background: rgba(120,20,20,0.35); }
-
-.offline-status {
-  color: #ffd6db;
-  font-weight: 600;
-  letter-spacing: 0.2px;
-}
 a { color: #7ca0ff; }
 
 .result-footer {
