@@ -9,6 +9,7 @@ a = Analysis(
     datas=[
         ('static', 'static'),
         ('templates', 'templates'),
+        ('gui.py', '.'),
         ('config.json', '.'),
         ('oui.txt', '.'),
     ],
