@@ -10,7 +10,6 @@ a = Analysis(
         ('oui.txt', '.'),
         ('static', 'static'),
         ('templates', 'templates'),
-        ('gui.py', '.'),
     ],
     hiddenimports=[
         'collector',
@@ -23,7 +22,6 @@ a = Analysis(
         'click',
         'itsdangerous',
         'markupsafe',
-        'tkinter',
     ],
     hookspath=[],
     hooksconfig={},
