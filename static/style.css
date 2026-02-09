@@ -162,6 +162,8 @@ tr.offline { background: rgba(120,20,20,0.35); }
 }
 a { color: #7ca0ff; }
 
+a { color: #7ca0ff; }
+
 .result-footer {
   margin-top: var(--g8);
   text-align: right;
