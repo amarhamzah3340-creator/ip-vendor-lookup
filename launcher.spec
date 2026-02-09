@@ -12,8 +12,6 @@ a = Analysis(
         ('templates', 'templates'),
         ('gui.py', '.'),
         ('launcher_gui.py', '.'),
-        ('collector.py', '.'),
-        ('web.py', '.'),
     ],
     hiddenimports=[
         'collector',

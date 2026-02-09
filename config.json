@@ -6,7 +6,7 @@
       "ip": "103.111.118.17",
       "username": "NOC@hamzah",
       "password": "ugr009988",
-      "port": 8274
+      "port": 1080
     },
     {
       "id": "router2",
@@ -14,7 +14,7 @@
       "ip": "10.4.19.3",
       "username": "NOC@upaznet",
       "password": "ugr009988",
-      "port": 8274
+      "port": 1080
     },
     {
       "id": "router3",
@@ -22,7 +22,7 @@
       "ip": "10.4.16.2",
       "username": "NOC@upaznet",
       "password": "ugr009988",
-      "port": 8274
+      "port": 1080
     }
   ],
   "poll_interval": 30,
