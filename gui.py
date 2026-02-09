@@ -1,3 +1,4 @@
+import socket
 import subprocess
 import sys
 import threading
@@ -10,11 +11,12 @@ from tkinter.scrolledtext import ScrolledText
 
 
 class MonitorGUI:
-    def __init__(self, auto_start: bool = False, host: str = "127.0.0.1", port: int = 1080):
+    def __init__(self, auto_start: bool = False, port: int = 1080):
         self.auto_start_default = auto_start
-        self.host = host
         self.port = port
-        self.url = f"http://{self.host}:{self.port}"
+        self.local_ip = self._detect_local_ip()
+        self.local_url = f"http://127.0.0.1:{self.port}"
+        self.lan_url = f"http://{self.local_ip}:{self.port}"
 
         self._proc = None
         self._reader_thread = None
@@ -22,94 +24,119 @@ class MonitorGUI:
 
         self.root = tk.Tk()
         self.root.title("MikroTik PPP Monitor")
-        self.root.geometry("1000x680")
+        self.root.geometry("880x560")
+        self.root.minsize(820, 520)
         self.root.configure(bg="#071247")
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self.status_var = tk.StringVar(value="Stopped")
-        self.url_var = tk.StringVar(value=self.url)
+        self.url_var = tk.StringVar(value=self.lan_url)
         self.auto_start_var = tk.BooleanVar(value=self.auto_start_default)
         self.auto_open_var = tk.BooleanVar(value=True)
 
         self._build_ui()
 
+    def _detect_local_ip(self) -> str:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            sock.connect(("8.8.8.8", 80))
+            return sock.getsockname()[0]
+        except OSError:
+            return "127.0.0.1"
+        finally:
+            sock.close()
+
     def _build_ui(self) -> None:
         container = tk.Frame(self.root, bg="#071247")
-        container.pack(fill="both", expand=True, padx=20, pady=20)
+        container.pack(fill="both", expand=True, padx=16, pady=16)
 
         title = tk.Label(
             container,
             text="⚡  MikroTik PPP Monitor",
-            font=("Segoe UI", 28, "bold"),
+            font=("Segoe UI", 22, "bold"),
             fg="#F2F4FF",
             bg="#071247",
             anchor="w",
         )
-        title.pack(fill="x", pady=(0, 18))
+        title.pack(fill="x", pady=(0, 12))
 
-        info = tk.Frame(container, bg="#101F63", padx=16, pady=14)
-        info.pack(fill="x", pady=(0, 16))
+        info = tk.Frame(container, bg="#101F63", padx=12, pady=10)
+        info.pack(fill="x", pady=(0, 12))
 
-        tk.Label(info, text="Status:", font=("Segoe UI", 19), fg="#DDE5FF", bg="#101F63").pack(side="left")
-        self.status_label = tk.Label(info, textvariable=self.status_var, font=("Segoe UI", 19, "bold"), fg="#66F18A", bg="#101F63")
-        self.status_label.pack(side="left", padx=(12, 28))
+        tk.Label(info, text="Status:", font=("Segoe UI", 14), fg="#DDE5FF", bg="#101F63").pack(side="left")
+        self.status_label = tk.Label(info, textvariable=self.status_var, font=("Segoe UI", 14, "bold"), fg="#66F18A", bg="#101F63")
+        self.status_label.pack(side="left", padx=(10, 18))
 
-        tk.Label(info, text="URL:", font=("Segoe UI", 19), fg="#DDE5FF", bg="#101F63").pack(side="left")
-        link = tk.Label(info, textvariable=self.url_var, font=("Segoe UI", 19, "underline"), fg="#66A3FF", bg="#101F63", cursor="hand2")
+        tk.Label(info, text="LAN URL:", font=("Segoe UI", 14), fg="#DDE5FF", bg="#101F63").pack(side="left")
+        link = tk.Label(info, textvariable=self.url_var, font=("Segoe UI", 14, "underline"), fg="#66A3FF", bg="#101F63", cursor="hand2")
         link.pack(side="left")
-        link.bind("<Button-1>", lambda _e: self.open_browser())
+        link.bind("<Button-1>", lambda _e: self.open_browser(use_lan=True))
 
         button_row = tk.Frame(container, bg="#071247")
-        button_row.pack(fill="x", pady=(0, 16))
+        button_row.pack(fill="x", pady=(0, 12))
 
         self.start_btn = tk.Button(
             button_row,
-            text="▶ Start Server",
-            font=("Segoe UI", 16, "bold"),
+            text="▶ Start",
+            font=("Segoe UI", 12, "bold"),
             bg="#4E75EE",
             fg="white",
             activebackground="#3E63D3",
             relief="flat",
-            padx=20,
-            pady=14,
+            padx=16,
+            pady=10,
             command=self.start_server,
         )
-        self.start_btn.pack(side="left", padx=(0, 10))
+        self.start_btn.pack(side="left", padx=(0, 8))
 
         self.stop_btn = tk.Button(
             button_row,
-            text="■ Stop Server",
-            font=("Segoe UI", 16, "bold"),
+            text="■ Stop",
+            font=("Segoe UI", 12, "bold"),
             bg="#F3656D",
             fg="white",
             activebackground="#E2525B",
             relief="flat",
-            padx=20,
-            pady=14,
+            padx=16,
+            pady=10,
             command=self.stop_server,
             state="disabled",
         )
-        self.stop_btn.pack(side="left", padx=(0, 10))
+        self.stop_btn.pack(side="left", padx=(0, 8))
 
-        open_btn = tk.Button(
+        open_local_btn = tk.Button(
             button_row,
-            text="🌐 Open Browser",
-            font=("Segoe UI", 16),
+            text="🌐 Open Localhost",
+            font=("Segoe UI", 12),
             bg="#4E75EE",
             fg="white",
             activebackground="#3E63D3",
             relief="flat",
-            padx=20,
-            pady=14,
-            command=self.open_browser,
+            padx=12,
+            pady=10,
+            command=lambda: self.open_browser(use_lan=False),
         )
-        open_btn.pack(side="left", padx=(0, 14))
+        open_local_btn.pack(side="left", padx=(0, 8))
+
+        open_lan_btn = tk.Button(
+            button_row,
+            text="🌍 Open LAN IP",
+            font=("Segoe UI", 12),
+            bg="#3E63D3",
+            fg="white",
+            activebackground="#2f53c3",
+            relief="flat",
+            padx=12,
+            pady=10,
+            command=lambda: self.open_browser(use_lan=True),
+        )
+        open_lan_btn.pack(side="left", padx=(0, 8))
 
         auto_open_cb = tk.Checkbutton(
             button_row,
-            text="Auto-open browser saat server started",
+            text="Auto-open saat start",
             variable=self.auto_open_var,
-            font=("Segoe UI", 13),
+            font=("Segoe UI", 11),
             fg="#E4EAFF",
             bg="#071247",
             activebackground="#071247",
@@ -120,33 +147,33 @@ class MonitorGUI:
 
         clear_btn = tk.Button(
             button_row,
-            text="🗑 Clear Log",
-            font=("Segoe UI", 13),
+            text="🗑 Clear",
+            font=("Segoe UI", 11),
             bg="#15296F",
             fg="#E4EAFF",
             relief="flat",
-            padx=16,
-            pady=10,
+            padx=10,
+            pady=8,
             command=self.clear_log,
         )
         clear_btn.pack(side="right")
 
-        log_frame = tk.Frame(container, bg="#101F63", padx=14, pady=14)
+        log_frame = tk.Frame(container, bg="#101F63", padx=10, pady=10)
         log_frame.pack(fill="both", expand=True)
 
-        tk.Label(log_frame, text="📋 System Log", font=("Segoe UI", 20, "bold"), fg="#F2F4FF", bg="#101F63").pack(anchor="w", pady=(0, 12))
+        tk.Label(log_frame, text="📋 System Log", font=("Segoe UI", 15, "bold"), fg="#F2F4FF", bg="#101F63").pack(anchor="w", pady=(0, 8))
 
         self.log_text = ScrolledText(
             log_frame,
             wrap="word",
-            height=20,
+            height=16,
             bg="#000000",
             fg="#00FF5A",
             insertbackground="#00FF5A",
-            font=("Consolas", 13),
+            font=("Consolas", 10),
             relief="flat",
-            padx=12,
-            pady=12,
+            padx=10,
+            pady=10,
         )
         self.log_text.pack(fill="both", expand=True)
         self.log_text.configure(state="disabled")
@@ -193,7 +220,7 @@ class MonitorGUI:
             str(self.port),
         ]
 
-        self._append_log(f"Starting MikroTik Monitor on {self.url}")
+        self._append_log(f"Starting server on localhost {self.local_url} and LAN {self.lan_url}")
         self._proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -208,7 +235,25 @@ class MonitorGUI:
         self._reader_thread.start()
 
         if self.auto_open_var.get():
-            self.root.after(1200, self.open_browser)
+            threading.Thread(target=self._open_browser_when_ready, daemon=True).start()
+
+    def _open_browser_when_ready(self) -> None:
+        if self._wait_server_ready(timeout=12):
+            self.root.after(0, lambda: self.open_browser(use_lan=False))
+        else:
+            self.root.after(0, self._append_log, "Server belum ready, coba klik Open Localhost", "WARN")
+
+    def _wait_server_ready(self, timeout: int = 12) -> bool:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if self._proc is None or self._proc.poll() is not None:
+                return False
+            try:
+                with socket.create_connection(("127.0.0.1", self.port), timeout=0.6):
+                    return True
+            except OSError:
+                time.sleep(0.25)
+        return False
 
     def _stream_logs(self) -> None:
         proc = self._proc
@@ -242,9 +287,10 @@ class MonitorGUI:
 
         self._set_running_ui(False)
 
-    def open_browser(self) -> None:
-        webbrowser.open(self.url)
-        self._append_log(f"Opening browser: {self.url}")
+    def open_browser(self, use_lan: bool = False) -> None:
+        target = self.lan_url if use_lan else self.local_url
+        webbrowser.open(target)
+        self._append_log(f"Opening browser: {target}")
 
     def _on_close(self) -> None:
         self.stop_server()
@@ -253,6 +299,8 @@ class MonitorGUI:
     def run(self) -> None:
         self._append_log("============================================================")
         self._append_log("MikroTik PPP Monitor GUI")
+        self._append_log(f"Localhost URL: {self.local_url}")
+        self._append_log(f"LAN URL: {self.lan_url}")
         self._append_log("============================================================")
         self._set_running_ui(False)
 
