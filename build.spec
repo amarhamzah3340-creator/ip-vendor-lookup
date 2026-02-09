@@ -3,12 +3,14 @@
 block_cipher = None
 
 a = Analysis(
-    ['launcher.py'],
+    ['launcher_gui.py'],
     pathex=[],
     binaries=[],
     datas=[
         ('static', 'static'),
         ('templates', 'templates'),
+        ('gui.py', '.'),
+        ('launcher_gui.py', '.'),
         ('config.json', '.'),
         ('oui.txt', '.'),
     ],
@@ -16,6 +18,7 @@ a = Analysis(
         'collector',
         'web',
         'gui',
+        'launcher_gui',
         'flask',
         'routeros_api',
         'werkzeug',
