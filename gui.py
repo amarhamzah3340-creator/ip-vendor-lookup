@@ -3,6 +3,7 @@ import threading
 import time
 import webbrowser
 from datetime import datetime
+from wsgiref.simple_server import WSGIRequestHandler, make_server
 from wsgiref.simple_server import make_server
 import tkinter as tk
 from tkinter.scrolledtext import ScrolledText
@@ -22,6 +23,9 @@ class MonitorGUI:
 
         self.root = tk.Tk()
         self.root.title("MikroTik PPP Monitor")
+        self.root.geometry("900x580")
+        self.root.minsize(840, 520)
+        self.root.configure(bg="#050b2e")
         self.root.geometry("880x560")
         self.root.minsize(820, 520)
         self.root.configure(bg="#071247")
@@ -45,11 +49,16 @@ class MonitorGUI:
             sock.close()
 
     def _build_ui(self) -> None:
+        container = tk.Frame(self.root, bg="#050b2e")
         container = tk.Frame(self.root, bg="#071247")
         container.pack(fill="both", expand=True, padx=16, pady=16)
 
         title = tk.Label(
             container,
+            text="⚡ MikroTik PPP Monitor",
+            font=("Segoe UI", 22, "bold"),
+            fg="#F2F4FF",
+            bg="#050b2e",
             text="⚡  MikroTik PPP Monitor",
             font=("Segoe UI", 22, "bold"),
             fg="#F2F4FF",
@@ -58,6 +67,40 @@ class MonitorGUI:
         )
         title.pack(fill="x", pady=(0, 12))
 
+        info = tk.Frame(container, bg="#0d1f66", padx=12, pady=10)
+        info.pack(fill="x", pady=(0, 12))
+
+        tk.Label(info, text="Status:", font=("Segoe UI", 14), fg="#DDE5FF", bg="#0d1f66").pack(side="left")
+        self.status_label = tk.Label(info, textvariable=self.status_var, font=("Segoe UI", 14, "bold"), fg="#66F18A", bg="#0d1f66")
+        self.status_label.pack(side="left", padx=(10, 18))
+
+        tk.Label(info, text="LAN URL:", font=("Segoe UI", 14), fg="#DDE5FF", bg="#0d1f66").pack(side="left")
+        link = tk.Label(info, textvariable=self.url_var, font=("Segoe UI", 14, "underline"), fg="#66A3FF", bg="#0d1f66", cursor="hand2")
+        link.pack(side="left")
+        link.bind("<Button-1>", lambda _e: self.open_browser(use_lan=True))
+
+        button_row = tk.Frame(container, bg="#050b2e")
+        button_row.pack(fill="x", pady=(0, 12))
+
+        self.start_btn = tk.Button(button_row, text="▶ Start", font=("Segoe UI", 12, "bold"), bg="#3f66ff", fg="white", activebackground="#3356de", relief="flat", padx=16, pady=10, command=self.start_server)
+        self.start_btn.pack(side="left", padx=(0, 8))
+
+        self.stop_btn = tk.Button(button_row, text="■ Stop", font=("Segoe UI", 12, "bold"), bg="#f05a73", fg="white", activebackground="#db4c65", relief="flat", padx=16, pady=10, command=self.stop_server, state="disabled")
+        self.stop_btn.pack(side="left", padx=(0, 8))
+
+        tk.Button(button_row, text="🌐 Open Localhost", font=("Segoe UI", 12), bg="#2146c5", fg="white", activebackground="#1b3cab", relief="flat", padx=12, pady=10, command=lambda: self.open_browser(use_lan=False)).pack(side="left", padx=(0, 8))
+        tk.Button(button_row, text="🌍 Open LAN IP", font=("Segoe UI", 12), bg="#1e3a9a", fg="white", activebackground="#1a3286", relief="flat", padx=12, pady=10, command=lambda: self.open_browser(use_lan=True)).pack(side="left", padx=(0, 8))
+
+        tk.Checkbutton(button_row, text="Auto-open saat start", variable=self.auto_open_var, font=("Segoe UI", 11), fg="#E4EAFF", bg="#050b2e", activebackground="#050b2e", activeforeground="#E4EAFF", selectcolor="#050b2e").pack(side="left")
+
+        tk.Button(button_row, text="🗑 Clear", font=("Segoe UI", 11), bg="#15296F", fg="#E4EAFF", relief="flat", padx=10, pady=8, command=self.clear_log).pack(side="right")
+
+        log_frame = tk.Frame(container, bg="#0d1f66", padx=10, pady=10)
+        log_frame.pack(fill="both", expand=True)
+
+        tk.Label(log_frame, text="📋 System Log", font=("Segoe UI", 15, "bold"), fg="#F2F4FF", bg="#0d1f66").pack(anchor="w", pady=(0, 8))
+
+        self.log_text = ScrolledText(log_frame, wrap="word", height=16, bg="#020715", fg="#00FF8A", insertbackground="#00FF8A", font=("Consolas", 10), relief="flat", padx=10, pady=10)
         info = tk.Frame(container, bg="#101F63", padx=12, pady=10)
         info.pack(fill="x", pady=(0, 12))
 
@@ -185,6 +228,9 @@ class MonitorGUI:
         self.log_text.see("end")
         self.log_text.configure(state="disabled")
 
+    def _append_log_threadsafe(self, message: str, level: str = "INFO") -> None:
+        self.root.after(0, self._append_log, message, level)
+
     def clear_log(self) -> None:
         self.log_text.configure(state="normal")
         self.log_text.delete("1.0", "end")
@@ -214,6 +260,17 @@ class MonitorGUI:
             return
 
         self._web_module = web_module
+        if hasattr(self._web_module, "set_log_callback"):
+            self._web_module.set_log_callback(self._append_log_threadsafe)
+
+        self._append_log(f"Starting embedded server on localhost {self.local_url} and LAN {self.lan_url}")
+
+        class GuiRequestHandler(WSGIRequestHandler):
+            def log_message(handler_self, fmt: str, *args) -> None:  # noqa: N805
+                self._append_log_threadsafe(fmt % args, "WEB")
+
+        try:
+            self._server = make_server("0.0.0.0", self.port, web_module.app, handler_class=GuiRequestHandler)
         self._append_log(f"Starting embedded server on localhost {self.local_url} and LAN {self.lan_url}")
 
         try:
