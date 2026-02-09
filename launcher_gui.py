@@ -1,12 +1,8 @@
-import importlib
-import importlib.util
 import socket
-import sys
 import threading
 import time
 import webbrowser
 from datetime import datetime
-from pathlib import Path
 from wsgiref.simple_server import WSGIRequestHandler, make_server
 import tkinter as tk
 from tkinter.scrolledtext import ScrolledText
@@ -128,61 +124,13 @@ class MonitorGUI:
             self.start_btn.configure(state="normal")
             self.stop_btn.configure(state="disabled")
 
-    def _prepare_runtime_paths(self) -> list[Path]:
-        roots: list[Path] = []
-
-        meipass = getattr(sys, "_MEIPASS", None)
-        if meipass:
-            roots.append(Path(meipass))
-
-        roots.append(Path(__file__).resolve().parent)
-        roots.append(Path(sys.executable).resolve().parent)
-
-        for root in roots:
-            root_s = str(root)
-            if root.exists() and root_s not in sys.path:
-                sys.path.insert(0, root_s)
-
-        return roots
-
-    def _load_module_from_file(self, module_name: str, file_path: Path):
-        if not file_path.exists():
-            return None
-
-        file_spec = importlib.util.spec_from_file_location(module_name, file_path)
-        if file_spec is None or file_spec.loader is None:
-            return None
-
-        module = importlib.util.module_from_spec(file_spec)
-        sys.modules[module_name] = module
-        file_spec.loader.exec_module(module)
-        return module
-
-    def _load_web_module(self):
-        roots = self._prepare_runtime_paths()
-
-        spec = importlib.util.find_spec("web")
-        if spec is not None:
-            return importlib.import_module("web")
-
-        for root in roots:
-            # Ensure collector is importable before web executes `from collector import ...`.
-            if "collector" not in sys.modules:
-                self._load_module_from_file("collector", root / "collector.py")
-
-            web_module = self._load_module_from_file("web", root / "web.py")
-            if web_module is not None:
-                return web_module
-
-        raise ModuleNotFoundError("No module named 'web'")
-
     def start_server(self) -> None:
         if self._server is not None:
             self._append_log("Server already running")
             return
 
         try:
-            web_module = self._load_web_module()
+            import web as web_module
         except Exception as exc:
             self._append_log(f"Failed to import web server deps: {exc}", "ERROR")
             return
