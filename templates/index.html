@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Tor Monitor Ketua</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="layout">
+
+  <aside class="sidebar">
+    <h2>IP<br>PPP Monitor</h2>
+
+    <textarea id="names" placeholder="PPP Name list..."></textarea>
+
+    <div class="vendor-wrap">
+      <input id="vendor" placeholder="Filter vendor (TP-Link, ZTE...)">
+      <div id="vendorDropdown" class="vendor-dropdown hidden"></div>
+    </div>
+
+    <button onclick="loadSecrets()">Load PPP Secret</button>
+    <button class="primary" onclick="processInput()">PROCESS</button>
+
+    <div class="divider"></div>
+
+    <button onclick="exportCSV(false)">Export ALL</button>
+    <button onclick="exportCSV(true)">Export CHECKED</button>
+  </aside>
+
+  <main class="content">
+
+    <header class="topbar">
+    <div class="status-left">
+        <div>Router: <b id="router">-</b></div>
+        <div>Status: <b id="statusText">-</b></div>
+    </div>
+
+    <div class="status-right">
+        <select id="routerSelect" class="router-select" onchange="changeRouter()">
+          <option value="">Select Router...</option>
+        </select>
+
+        <input
+        id="search"
+        class="top-search"
+        placeholder="Search PPP name..."
+        oninput="processInput()"
+        >
+
+        <div class="countdown">
+        <div>DB refresh in <span class="count"><b id="dbCountdown">-</b>s</span></div>
+        <div>Web refresh in <span class="count"><b id="webCountdown">-</b>s</span></div>
+        </div>
+    </div>
+    </header>
+
+
+    <section class="result-box">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>IP</th>
+            <th>MAC</th>
+            <th>Vendor</th>
+            <th>Uptime</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="table">
+          <tr><td colspan="6">Select a router to start...</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <div class="result-footer">
+      Online: <b id="onlineCount">0</b>
+    </div>
+
+  </main>
+</div>
+
+<div id="loader" class="bottom-loader hidden"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
