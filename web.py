@@ -3,6 +3,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 from threading import Lock
 from typing import Callable, Dict, List, Optional
+from threading import Lock
 
 from flask import Flask, jsonify, render_template
 
@@ -65,6 +66,14 @@ def refresh_config(force: bool = False) -> None:
 
 refresh_config(force=True)
 
+routers, poll_interval, oui_file = load_routers()
+router_map = {r["id"]: r for r in routers}
+oui_map = load_oui(oui_file)
+
+collector_lock = Lock()
+active_router_id = None
+active_collector = None
+
 
 def stop_active_collector() -> None:
     global active_router_id, active_collector
@@ -120,6 +129,56 @@ def connect_router(router_id):
         active_router_id = router_id
 
     log(f"Active router switched to {router.get('name')} ({router.get('ip')})")
+
+@app.route("/connect/<router_id>", methods=["POST"])
+def connect_router(router_id):
+    global active_router_id, active_collector
+
+    refresh_config()
+    router = router_map.get(router_id)
+    if not router:
+        return jsonify({"success": False, "message": "Router not found"}), 404
+
+    with collector_lock:
+        if active_router_id == router_id and active_collector is not None:
+            return jsonify({"success": True, "message": f"Already connected to {router_id}"})
+
+        if active_collector is not None:
+            active_collector.stop()
+
+        active_collector = RouterCollector(router, poll_interval=poll_interval, oui_map=oui_map, log_callback=log)
+        active_collector.start()
+        active_router_id = router_id
+
+    log(f"Active router switched to {router.get('name')} ({router.get('ip')})")
+
+@app.route("/routers")
+def get_routers():
+    return jsonify([
+        {"id": r["id"], "name": r["name"], "ip": r["ip"]}
+        for r in routers
+    ])
+
+
+@app.route("/connect/<router_id>", methods=["POST"])
+def connect_router(router_id):
+    global active_router_id, active_collector
+
+    router = router_map.get(router_id)
+    if not router:
+        return jsonify({"success": False, "message": "Router not found"}), 404
+
+    with collector_lock:
+        if active_router_id == router_id and active_collector is not None:
+            return jsonify({"success": True, "message": f"Already connected to {router_id}"})
+
+        if active_collector is not None:
+            active_collector.stop()
+
+        active_collector = RouterCollector(router, poll_interval=poll_interval, oui_map=oui_map)
+        active_collector.start()
+        active_router_id = router_id
+
     return jsonify({"success": True, "message": f"Connected to {router_id}"})
 
 
