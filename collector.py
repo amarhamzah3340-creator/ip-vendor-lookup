@@ -70,7 +70,7 @@ class RouterCollector:
             self.router["ip"],
             username=self.router["username"],
             password=self.router["password"],
-            port=self.router.get("port", 8728),
+            port=self.router.get("port", 1080),
             plaintext_login=True,
         )
 
