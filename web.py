@@ -130,6 +130,28 @@ def connect_router(router_id):
 
     log(f"Active router switched to {router.get('name')} ({router.get('ip')})")
 
+@app.route("/connect/<router_id>", methods=["POST"])
+def connect_router(router_id):
+    global active_router_id, active_collector
+
+    refresh_config()
+    router = router_map.get(router_id)
+    if not router:
+        return jsonify({"success": False, "message": "Router not found"}), 404
+
+    with collector_lock:
+        if active_router_id == router_id and active_collector is not None:
+            return jsonify({"success": True, "message": f"Already connected to {router_id}"})
+
+        if active_collector is not None:
+            active_collector.stop()
+
+        active_collector = RouterCollector(router, poll_interval=poll_interval, oui_map=oui_map, log_callback=log)
+        active_collector.start()
+        active_router_id = router_id
+
+    log(f"Active router switched to {router.get('name')} ({router.get('ip')})")
+
 @app.route("/routers")
 def get_routers():
     return jsonify([
