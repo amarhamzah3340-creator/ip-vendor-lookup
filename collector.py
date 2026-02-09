@@ -1,5 +1,7 @@
 import json
+import sys
 import threading
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from routeros_api import RouterOsApiPool
@@ -108,10 +110,35 @@ class RouterCollector:
                 self._api_pool = None
 
 
+def _resolve_path(path_str: str, base_dir: Optional[Path] = None) -> Path:
+    path = Path(path_str)
+    if path.is_absolute() and path.exists():
+        return path
+
+    candidates = []
+    if base_dir is not None:
+        candidates.append(base_dir / path)
+
+    candidates.append(Path.cwd() / path)
+    module_dir = Path(__file__).resolve().parent
+    candidates.append(module_dir / path)
+
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        candidates.append(Path(meipass) / path)
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+
+    return candidates[0] if candidates else path
+
+
 def load_oui(oui_file: str) -> Dict[str, str]:
     vendors: Dict[str, str] = {}
+    oui_path = _resolve_path(oui_file)
     try:
-        with open(oui_file, "r", encoding="utf-8", errors="ignore") as fh:
+        with oui_path.open("r", encoding="utf-8", errors="ignore") as fh:
             for line in fh:
                 if "(hex)" not in line:
                     continue
@@ -124,6 +151,10 @@ def load_oui(oui_file: str) -> Dict[str, str]:
 
 
 def load_routers(config_file: str = "config.json") -> Tuple[List[Dict], int, str]:
-    with open(config_file, "r", encoding="utf-8") as fh:
+    config_path = _resolve_path(config_file)
+    with config_path.open("r", encoding="utf-8") as fh:
         cfg = json.load(fh)
-    return cfg.get("routers", []), cfg.get("poll_interval", 30), cfg.get("oui_file", "oui.txt")
+
+    oui_value = cfg.get("oui_file", "oui.txt")
+    oui_path = _resolve_path(oui_value, base_dir=config_path.parent)
+    return cfg.get("routers", []), cfg.get("poll_interval", 30), str(oui_path)
