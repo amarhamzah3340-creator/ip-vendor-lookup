@@ -217,8 +217,8 @@ function refreshResult() {
             <td>${r.uptime}</td>
             <td><input type="checkbox" data-name="${name}" ${checked ? "checked" : ""}></td>
           </tr>`;
-        } else if (!lastVendor) {
-          html += `<tr class="offline"><td>${name}</td><td colspan="5">Not Connected</td></tr>`;
+        } else {
+          html += `<tr class="offline"><td>${name}</td><td colspan="5" class="offline-status">❌ Not found in active connection</td></tr>`;
         }
       });
 
