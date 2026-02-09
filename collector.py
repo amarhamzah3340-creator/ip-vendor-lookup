@@ -1,67 +1,129 @@
-import time
 import json
-import sys
+import threading
+from typing import Dict, List, Optional, Tuple
+
 from routeros_api import RouterOsApiPool
 
-MIKROTIK_LOCAL_IP = "192.168.1.1"
-MIKROTIK_VPN_IP = "10.10.10.1"
 
-MIKROTIK_USER = "user"
-MIKROTIK_PASS = "pass"
-MIKROTIK_PORT = 8728
+class RouterCollector:
+    def __init__(self, router: Dict, poll_interval: int = 30, oui_map: Optional[Dict[str, str]] = None):
+        self.router = router
+        self.poll_interval = poll_interval
+        self.oui_map = oui_map or {}
 
-POLL_INTERVAL = 60
-CACHE_FILE = "ppp_active.json"
+        self._stop_event = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+        self._api_pool: Optional[RouterOsApiPool] = None
 
-MODE = "local"
-if len(sys.argv) > 1:
-    MODE = sys.argv[1]
+        self._lock = threading.Lock()
+        self._data: List[Dict] = []
+        self._connected = False
+        self._last_error = ""
 
-MIKROTIK_IP = MIKROTIK_LOCAL_IP if MODE == "local" else MIKROTIK_VPN_IP
+    def start(self) -> None:
+        if self._thread and self._thread.is_alive():
+            return
 
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._run, name=f"collector-{self.router['id']}", daemon=True)
+        self._thread.start()
 
-def save_cache(data):
-    with open(CACHE_FILE, "w") as f:
-        json.dump(data, f, indent=2)
+    def stop(self) -> None:
+        self._stop_event.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=self.poll_interval + 2)
+        self._disconnect()
 
+    def status(self) -> Dict:
+        with self._lock:
+            return {
+                "connected": self._connected,
+                "router_ip": self.router.get("ip"),
+                "last_error": self._last_error,
+            }
 
-def main():
-    print(f"[INFO] Connecting to MikroTik ({MODE})...")
+    def get_data(self) -> List[Dict]:
+        with self._lock:
+            return list(self._data)
 
-    while True:
-        try:
-            api_pool = RouterOsApiPool(
-                MIKROTIK_IP,
-                username=MIKROTIK_USER,
-                password=MIKROTIK_PASS,
-                port=MIKROTIK_PORT,
-                plaintext_login=True
+    def _run(self) -> None:
+        while not self._stop_event.is_set():
+            try:
+                self._connect()
+                data = self._fetch_ppp_active()
+                with self._lock:
+                    self._data = data
+                    self._connected = True
+                    self._last_error = ""
+            except Exception as exc:
+                with self._lock:
+                    self._connected = False
+                    self._last_error = str(exc)
+            finally:
+                # Always disconnect after every polling cycle so stop() doesn't leave hanging connection.
+                self._disconnect()
+
+            self._stop_event.wait(self.poll_interval)
+
+    def _connect(self) -> None:
+        self._api_pool = RouterOsApiPool(
+            self.router["ip"],
+            username=self.router["username"],
+            password=self.router["password"],
+            port=self.router.get("port", 8728),
+            plaintext_login=True,
+        )
+
+    def _fetch_ppp_active(self) -> List[Dict]:
+        if not self._api_pool:
+            return []
+
+        api = self._api_pool.get_api()
+        resource = api.get_resource("/ppp/active")
+        result = []
+        for item in resource.get():
+            mac = item.get("caller-id", "")
+            result.append(
+                {
+                    "name": item.get("name", ""),
+                    "ip": item.get("address", ""),
+                    "mac": mac,
+                    "vendor": self._lookup_vendor(mac),
+                    "uptime": item.get("uptime", "-"),
+                }
             )
+        return result
 
-            api = api_pool.get_api()
-            ppp = api.get_resource("/ppp/active")
-            actives = ppp.get()
+    def _lookup_vendor(self, mac: str) -> str:
+        key = mac.upper().replace("-", ":")[0:8]
+        return self.oui_map.get(key, "Unknown")
 
-            result = []
-
-            for a in actives:
-                result.append({
-                    "name": a.get("name"),
-                    "ip": a.get("address"),
-                    "mac": a.get("caller-id"),
-                    "uptime": a.get("uptime"),
-                    "service": a.get("service")
-                })
-
-            save_cache(result)
-
-            print(f"[OK] Updated {len(result)} users")
-
-        except Exception as e:
-            print("[ERROR]", e)
-
-        time.sleep(POLL_INTERVAL)
+    def _disconnect(self) -> None:
+        if self._api_pool is not None:
+            try:
+                self._api_pool.disconnect()
+            except Exception:
+                pass
+            finally:
+                self._api_pool = None
 
 
-if __name__ == "__main__":
-    main()
+def load_oui(oui_file: str) -> Dict[str, str]:
+    vendors: Dict[str, str] = {}
+    try:
+        with open(oui_file, "r", encoding="utf-8", errors="ignore") as fh:
+            for line in fh:
+                if "(hex)" not in line:
+                    continue
+                prefix, vendor = line.split("(hex)", maxsplit=1)
+                key = prefix.strip().replace("-", ":")
+                vendors[key] = vendor.strip()
+    except FileNotFoundError:
+        return {}
+    return vendors
+
+
+def load_routers(config_file: str = "config.json") -> Tuple[List[Dict], int, str]:
+    with open(config_file, "r", encoding="utf-8") as fh:
+        cfg = json.load(fh)
+    return cfg.get("routers", []), cfg.get("poll_interval", 30), cfg.get("oui_file", "oui.txt")
