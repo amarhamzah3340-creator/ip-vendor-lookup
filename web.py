@@ -1,76 +1,167 @@
-from flask import Flask, render_template_string, request
-import json
+import atexit
+from argparse import ArgumentParser
+from pathlib import Path
+from threading import Lock
+from typing import Callable, Dict, List, Optional
+
+from flask import Flask, jsonify, render_template
+
+from collector import RouterCollector, load_oui, load_routers
 
 app = Flask(__name__)
 
-HTML = """
-<!doctype html>
-<html>
-<head>
-<title>PPP Monitor</title>
-<script>
-setInterval(() => location.reload(), 5000);
-</script>
-</head>
-<body>
-<h2>PPP Active Monitor</h2>
+collector_lock = Lock()
+config_lock = Lock()
+active_router_id = None
+active_collector = None
 
-<form method="POST">
-<textarea name="names" rows="10" cols="40" placeholder="Input PPP name"></textarea><br>
-<button type="submit">Cek</button>
-</form>
+routers: List[Dict] = []
+router_map: Dict[str, Dict] = {}
+poll_interval = 30
+oui_file = "oui.txt"
+oui_map: Dict[str, str] = {}
+config_path = "config.json"
+_last_config_mtime: Optional[float] = None
+_last_oui_mtime: Optional[float] = None
 
-{% if results %}
-<table border="1">
-<tr><th>Name</th><th>IP</th><th>MAC</th><th>Uptime</th></tr>
-{% for r in results %}
-<tr>
-<td>{{r.name}}</td>
-<td>
-{% if r.ip %}
-<a href="http://{{r.ip}}" target="_blank">{{r.ip}}</a>
-{% else %}
-Not Connected
-{% endif %}
-</td>
-<td>{{r.mac}}</td>
-<td>{{r.uptime}}</td>
-</tr>
-{% endfor %}
-</table>
-{% endif %}
-</body>
-</html>
-"""
+_log_callback: Optional[Callable[[str, str], None]] = None
 
-@app.route("/", methods=["GET","POST"])
+
+def log(message: str, level: str = "INFO") -> None:
+    if _log_callback:
+        _log_callback(message, level)
+
+
+def set_log_callback(callback: Optional[Callable[[str, str], None]]) -> None:
+    global _log_callback
+    _log_callback = callback
+
+
+def _load_config(force: bool = False) -> None:
+    global routers, router_map, poll_interval, oui_file, oui_map, config_path, _last_config_mtime, _last_oui_mtime
+
+    new_routers, new_poll_interval, new_oui_file, new_config_path = load_routers()
+    config_mtime = Path(new_config_path).stat().st_mtime if Path(new_config_path).exists() else None
+    oui_mtime = Path(new_oui_file).stat().st_mtime if Path(new_oui_file).exists() else None
+
+    if not force and config_mtime == _last_config_mtime and oui_mtime == _last_oui_mtime:
+        return
+
+    routers = new_routers
+    router_map = {r["id"]: r for r in routers}
+    poll_interval = new_poll_interval
+    oui_file = new_oui_file
+    oui_map = load_oui(oui_file)
+    config_path = new_config_path
+    _last_config_mtime = config_mtime
+    _last_oui_mtime = oui_mtime
+    log(f"Config reloaded ({len(routers)} routers, poll={poll_interval}s, oui={oui_file})")
+
+
+def refresh_config(force: bool = False) -> None:
+    with config_lock:
+        _load_config(force=force)
+
+
+refresh_config(force=True)
+
+
+def stop_active_collector() -> None:
+    global active_router_id, active_collector
+
+    with collector_lock:
+        if active_collector is not None:
+            active_collector.stop()
+        active_collector = None
+        active_router_id = None
+
+
+atexit.register(stop_active_collector)
+
+
+@app.route("/")
 def index():
-    results = []
+    return render_template("index.html")
 
-    if request.method == "POST":
-        names = request.form.get("names","").splitlines()
 
-        try:
-            with open("ppp_active.json") as f:
-                data = json.load(f)
-        except:
-            data = []
+@app.route("/routers")
+def get_routers():
+    refresh_config()
+    return jsonify([
+        {"id": r["id"], "name": r["name"], "ip": r["ip"]}
+        for r in routers
+    ])
 
-        for name in names:
-            found = next((x for x in data if x["name"] == name.strip()), None)
 
-            if found:
-                results.append(found)
-            else:
-                results.append({
-                    "name": name,
-                    "ip": None,
-                    "mac": "-",
-                    "uptime": "-"
-                })
+@app.route("/vendors")
+def get_vendors():
+    refresh_config()
+    return jsonify(sorted({v for v in oui_map.values() if v}))
 
-    return render_template_string(HTML, results=results)
+
+@app.route("/connect/<router_id>", methods=["POST"])
+def connect_router(router_id):
+    global active_router_id, active_collector
+
+    refresh_config()
+    router = router_map.get(router_id)
+    if not router:
+        return jsonify({"success": False, "message": "Router not found"}), 404
+
+    with collector_lock:
+        if active_router_id == router_id and active_collector is not None:
+            return jsonify({"success": True, "message": f"Already connected to {router_id}"})
+
+        if active_collector is not None:
+            active_collector.stop()
+
+        active_collector = RouterCollector(router, poll_interval=poll_interval, oui_map=oui_map, log_callback=log)
+        active_collector.start()
+        active_router_id = router_id
+
+    log(f"Active router switched to {router.get('name')} ({router.get('ip')})")
+    return jsonify({"success": True, "message": f"Connected to {router_id}"})
+
+
+@app.route("/status/<router_id>")
+def status(router_id):
+    refresh_config()
+    if router_id != active_router_id or active_collector is None:
+        return jsonify({"connected": False, "router_ip": router_map.get(router_id, {}).get("ip")})
+    return jsonify(active_collector.status())
+
+
+@app.route("/data/<router_id>")
+def data(router_id):
+    refresh_config()
+    if router_id != active_router_id or active_collector is None:
+        return jsonify([])
+    return jsonify(active_collector.get_data())
+
+
+@app.route("/secrets/<router_id>")
+def secrets(router_id):
+    refresh_config()
+    if router_id != active_router_id or active_collector is None:
+        return jsonify([])
+
+    rows = active_collector.get_data()
+    names = sorted({r.get("name", "") for r in rows if r.get("name")})
+    return jsonify(names)
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=1080)
+    parser = ArgumentParser(description="PPP monitor web server")
+    parser.add_argument(
+        "--start",
+        action="store_true",
+        help="Start Flask server. Without this flag, script only validates config and exits.",
+    )
+    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--port", type=int, default=1080)
+    args = parser.parse_args()
+
+    if args.start:
+        app.run(host=args.host, port=args.port)
+    else:
+        print("Server not started. Use --start to run the web server.")
