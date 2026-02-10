@@ -4,7 +4,6 @@ import time
 import webbrowser
 from datetime import datetime
 from wsgiref.simple_server import WSGIRequestHandler, make_server
-from wsgiref.simple_server import make_server
 import tkinter as tk
 from tkinter.scrolledtext import ScrolledText
 
@@ -26,9 +25,6 @@ class MonitorGUI:
         self.root.geometry("900x580")
         self.root.minsize(840, 520)
         self.root.configure(bg="#050b2e")
-        self.root.geometry("880x560")
-        self.root.minsize(820, 520)
-        self.root.configure(bg="#071247")
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self.status_var = tk.StringVar(value="Stopped")
@@ -50,7 +46,6 @@ class MonitorGUI:
 
     def _build_ui(self) -> None:
         container = tk.Frame(self.root, bg="#050b2e")
-        container = tk.Frame(self.root, bg="#071247")
         container.pack(fill="both", expand=True, padx=16, pady=16)
 
         title = tk.Label(
@@ -59,10 +54,6 @@ class MonitorGUI:
             font=("Segoe UI", 22, "bold"),
             fg="#F2F4FF",
             bg="#050b2e",
-            text="⚡  MikroTik PPP Monitor",
-            font=("Segoe UI", 22, "bold"),
-            fg="#F2F4FF",
-            bg="#071247",
             anchor="w",
         )
         title.pack(fill="x", pady=(0, 12))
@@ -101,121 +92,6 @@ class MonitorGUI:
         tk.Label(log_frame, text="📋 System Log", font=("Segoe UI", 15, "bold"), fg="#F2F4FF", bg="#0d1f66").pack(anchor="w", pady=(0, 8))
 
         self.log_text = ScrolledText(log_frame, wrap="word", height=16, bg="#020715", fg="#00FF8A", insertbackground="#00FF8A", font=("Consolas", 10), relief="flat", padx=10, pady=10)
-        info = tk.Frame(container, bg="#101F63", padx=12, pady=10)
-        info.pack(fill="x", pady=(0, 12))
-
-        tk.Label(info, text="Status:", font=("Segoe UI", 14), fg="#DDE5FF", bg="#101F63").pack(side="left")
-        self.status_label = tk.Label(info, textvariable=self.status_var, font=("Segoe UI", 14, "bold"), fg="#66F18A", bg="#101F63")
-        self.status_label.pack(side="left", padx=(10, 18))
-
-        tk.Label(info, text="LAN URL:", font=("Segoe UI", 14), fg="#DDE5FF", bg="#101F63").pack(side="left")
-        link = tk.Label(info, textvariable=self.url_var, font=("Segoe UI", 14, "underline"), fg="#66A3FF", bg="#101F63", cursor="hand2")
-        link.pack(side="left")
-        link.bind("<Button-1>", lambda _e: self.open_browser(use_lan=True))
-
-        button_row = tk.Frame(container, bg="#071247")
-        button_row.pack(fill="x", pady=(0, 12))
-
-        self.start_btn = tk.Button(
-            button_row,
-            text="▶ Start",
-            font=("Segoe UI", 12, "bold"),
-            bg="#4E75EE",
-            fg="white",
-            activebackground="#3E63D3",
-            relief="flat",
-            padx=16,
-            pady=10,
-            command=self.start_server,
-        )
-        self.start_btn.pack(side="left", padx=(0, 8))
-
-        self.stop_btn = tk.Button(
-            button_row,
-            text="■ Stop",
-            font=("Segoe UI", 12, "bold"),
-            bg="#F3656D",
-            fg="white",
-            activebackground="#E2525B",
-            relief="flat",
-            padx=16,
-            pady=10,
-            command=self.stop_server,
-            state="disabled",
-        )
-        self.stop_btn.pack(side="left", padx=(0, 8))
-
-        open_local_btn = tk.Button(
-            button_row,
-            text="🌐 Open Localhost",
-            font=("Segoe UI", 12),
-            bg="#4E75EE",
-            fg="white",
-            activebackground="#3E63D3",
-            relief="flat",
-            padx=12,
-            pady=10,
-            command=lambda: self.open_browser(use_lan=False),
-        )
-        open_local_btn.pack(side="left", padx=(0, 8))
-
-        open_lan_btn = tk.Button(
-            button_row,
-            text="🌍 Open LAN IP",
-            font=("Segoe UI", 12),
-            bg="#3E63D3",
-            fg="white",
-            activebackground="#2f53c3",
-            relief="flat",
-            padx=12,
-            pady=10,
-            command=lambda: self.open_browser(use_lan=True),
-        )
-        open_lan_btn.pack(side="left", padx=(0, 8))
-
-        auto_open_cb = tk.Checkbutton(
-            button_row,
-            text="Auto-open saat start",
-            variable=self.auto_open_var,
-            font=("Segoe UI", 11),
-            fg="#E4EAFF",
-            bg="#071247",
-            activebackground="#071247",
-            activeforeground="#E4EAFF",
-            selectcolor="#071247",
-        )
-        auto_open_cb.pack(side="left")
-
-        clear_btn = tk.Button(
-            button_row,
-            text="🗑 Clear",
-            font=("Segoe UI", 11),
-            bg="#15296F",
-            fg="#E4EAFF",
-            relief="flat",
-            padx=10,
-            pady=8,
-            command=self.clear_log,
-        )
-        clear_btn.pack(side="right")
-
-        log_frame = tk.Frame(container, bg="#101F63", padx=10, pady=10)
-        log_frame.pack(fill="both", expand=True)
-
-        tk.Label(log_frame, text="📋 System Log", font=("Segoe UI", 15, "bold"), fg="#F2F4FF", bg="#101F63").pack(anchor="w", pady=(0, 8))
-
-        self.log_text = ScrolledText(
-            log_frame,
-            wrap="word",
-            height=16,
-            bg="#000000",
-            fg="#00FF5A",
-            insertbackground="#00FF5A",
-            font=("Consolas", 10),
-            relief="flat",
-            padx=10,
-            pady=10,
-        )
         self.log_text.pack(fill="both", expand=True)
         self.log_text.configure(state="disabled")
 
@@ -271,10 +147,6 @@ class MonitorGUI:
 
         try:
             self._server = make_server("0.0.0.0", self.port, web_module.app, handler_class=GuiRequestHandler)
-        self._append_log(f"Starting embedded server on localhost {self.local_url} and LAN {self.lan_url}")
-
-        try:
-            self._server = make_server("0.0.0.0", self.port, web_module.app)
         except Exception as exc:
             self._append_log(f"Failed starting server: {exc}", "ERROR")
             self._server = None
