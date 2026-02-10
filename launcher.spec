@@ -1,0 +1,58 @@
+# -*- mode: python ; coding: utf-8 -*-
+
+
+a = Analysis(
+    ['launcher_gui.py'],
+    pathex=[],
+    binaries=[],
+    datas=[
+        ('config.json', '.'),
+        ('oui.txt', '.'),
+        ('static', 'static'),
+        ('templates', 'templates'),
+        ('gui.py', '.'),
+        ('launcher_gui.py', '.'),
+    ],
+    hiddenimports=[
+        'collector',
+        'web',
+        'gui',
+        'launcher_gui',
+        'flask',
+        'routeros_api',
+        'werkzeug',
+        'jinja2',
+        'click',
+        'itsdangerous',
+        'markupsafe',
+        'tkinter',
+    ],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    noarchive=False,
+    optimize=0,
+)
+pyz = PYZ(a.pure)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.datas,
+    [],
+    name='MikroTikMonitor',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
