@@ -160,9 +160,8 @@ class MonitorGUI:
             server_thread = threading.Thread(target=server.serve_forever, daemon=True)
             server_thread.start()
 
-            self._server = server
-            self._server_thread = server_thread
-            self.root.after(0, self._on_server_started)
+        try:
+            self._server = make_server("0.0.0.0", self.port, web_module.app, handler_class=GuiRequestHandler)
         except Exception as exc:
             self.root.after(0, self._on_server_start_failed, str(exc))
 
