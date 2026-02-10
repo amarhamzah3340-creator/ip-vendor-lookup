@@ -3,53 +3,85 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>MikroTik IP PPP Monitor</title>
+<title>MikroTik PPP Monitor</title>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+<header class="top-nav">
+  <div class="brand-wrap">
+    <div class="brand-icon">📶</div>
+    <div>
+      <div class="brand-title">MikroTik PPP Monitor</div>
+      <div class="brand-subtitle">Active Session Monitor</div>
+    </div>
+  </div>
+
+  <div class="top-right">
+    <div class="router-pill"><span class="dot"></span> Router: <b id="statusNavText">Disconnected</b></div>
+    <button class="icon-btn" id="refreshThemeBtn" title="Refresh theme">⟳</button>
+    <button class="icon-btn" title="Settings">⚙</button>
+  </div>
+</header>
+
 <div class="layout">
-  <aside class="sidebar">
+  <aside class="sidebar glassy">
     <h2>IP<br>PPP Monitor</h2>
     <p class="subtext">MikroTik active session monitor</p>
 
-    <textarea id="names" placeholder="PPP Name list..."></textarea>
+    <div class="field-label">Router Selection</div>
+    <select id="routerSelect" class="router-select" onchange="changeRouter()">
+      <option value="">Select Router...</option>
+    </select>
 
+    <div class="field-label">Search Client ID / Name</div>
+    <input id="search" class="top-search" placeholder="Enter ID or Name..." oninput="processInput()">
+
+    <div class="field-label">Vendor Filter</div>
     <div class="vendor-wrap">
-      <input id="vendor" placeholder="Filter vendor (TP-Link, ZTE...)" autocomplete="off">
+      <input id="vendor" placeholder="All Vendors" autocomplete="off">
       <div id="vendorDropdown" class="vendor-dropdown hidden"></div>
     </div>
 
-    <button onclick="loadSecrets()">Load PPP Secret</button>
-    <button class="primary" onclick="processInput()">PROCESS</button>
+    <textarea id="names" placeholder="PPP Name list..."></textarea>
 
-    <div class="divider"></div>
+    <div class="timer-card db">DB Refresh <b id="dbCountdown">-</b>s</div>
+    <div class="timer-card web">Web Refresh <b id="webCountdown">-</b>s</div>
 
-    <button onclick="exportCSV(false)">Export ALL</button>
-    <button onclick="exportCSV(true)">Export CHECKED</button>
+    <button class="btn btn-blue" onclick="loadSecrets()">Load PPP Secret</button>
+    <button class="btn btn-purple" onclick="processInput()">Process</button>
+    <button class="btn" onclick="exportCSV(false)">Export All</button>
+    <button class="btn" onclick="exportCSV(true)">Export Checked</button>
   </aside>
 
   <main class="content">
-    <header class="topbar">
+    <header class="topbar glassy">
       <div class="status-left">
         <div>Router: <b id="router">-</b></div>
         <div>Status: <b id="statusText">-</b></div>
       </div>
 
-      <div class="status-right">
-        <select id="routerSelect" class="router-select" onchange="changeRouter()">
-          <option value="">Select Router...</option>
-        </select>
+      <div class="status-row">Router: <b id="router">-</b> • Status: <b id="statusText">-</b></div>
 
-        <input id="search" class="top-search" placeholder="Search PPP name..." oninput="processInput()">
-
-        <div class="countdown">
-          <div>DB refresh in <span class="count"><b id="dbCountdown">-</b>s</span></div>
-          <div>Web refresh in <span class="count"><b id="webCountdown">-</b>s</span></div>
-        </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>IP Address</th>
+              <th>MAC Address</th>
+              <th>Vendor</th>
+              <th>Uptime</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="table">
+            <tr><td colspan="7">Select a router to start...</td></tr>
+          </tbody>
+        </table>
       </div>
-    </header>
 
-    <section class="result-box">
+    <section class="result-box glassy">
       <table>
         <thead>
           <tr>
@@ -67,14 +99,20 @@
       </table>
     </section>
 
-    <div class="result-footer">
-      Online: <b id="onlineCount">0</b>
+    <div class="result-footer glassy">
+      <span id="onlineSummary">Showing <b id="onlineCount">0</b> of <b id="onlineTotal">0</b> online user</span>
     </div>
+
+    <section class="log-box glassy">
+      <h3>System Log</h3>
+      <div id="logPanel" class="log-panel"></div>
+    </section>
   </main>
 </div>
 
 <div id="loader" class="bottom-loader hidden"></div>
 
+<script src="/static/theme.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

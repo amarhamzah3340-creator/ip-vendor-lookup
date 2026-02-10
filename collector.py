@@ -26,6 +26,7 @@ class RouterCollector:
 
         self._lock = threading.Lock()
         self._data: List[Dict] = []
+        self._secrets: List[str] = []
         self._connected = False
         self._last_error = ""
 
@@ -61,13 +62,19 @@ class RouterCollector:
         with self._lock:
             return list(self._data)
 
+    def get_secrets(self) -> List[str]:
+        with self._lock:
+            return list(self._secrets)
+
     def _run(self) -> None:
         while not self._stop_event.is_set():
             try:
                 self._connect()
                 data = self._fetch_ppp_active()
+                secrets = self._fetch_ppp_secrets()
                 with self._lock:
                     self._data = data
+                    self._secrets = secrets
                     self._connected = True
                     self._last_error = ""
                 self._log(f"Fetched {len(data)} PPP active rows from {self.router.get('ip')}")
@@ -77,6 +84,7 @@ class RouterCollector:
                     self._last_error = str(exc)
                 self._log(f"Router polling error {self.router.get('ip')}: {exc}", "ERROR")
             finally:
+                # Always disconnect after every polling cycle so stop() doesn't leave hanging connection.
                 self._disconnect()
 
             self._stop_event.wait(self.poll_interval)
@@ -110,6 +118,14 @@ class RouterCollector:
                 }
             )
         return result
+
+    def _fetch_ppp_secrets(self) -> List[str]:
+        if not self._api_pool:
+            return []
+
+        api = self._api_pool.get_api()
+        resource = api.get_resource("/ppp/secret")
+        return sorted({item.get("name", "") for item in resource.get() if item.get("name")})
 
     def _lookup_vendor(self, mac: str) -> str:
         key = mac.upper().replace("-", ":")[0:8]
