@@ -24,17 +24,9 @@
 </header>
 
 <div class="layout">
-  <aside class="sidebar panel">
-    <div class="stats">
-      <div class="stat-card connected">
-        <div class="stat-num" id="onlineTotal">0</div>
-        <div class="stat-label">ACTIVE</div>
-      </div>
-      <div class="stat-card disconnected">
-        <div class="stat-num" id="offlineCount">0</div>
-        <div class="stat-label">NOT CONNECTED</div>
-      </div>
-    </div>
+  <aside class="sidebar glassy">
+    <h2>IP<br>PPP Monitor</h2>
+    <p class="subtext">MikroTik active session monitor</p>
 
     <div class="field-label">Router Selection</div>
     <select id="routerSelect" class="router-select" onchange="changeRouter()">
@@ -62,13 +54,10 @@
   </aside>
 
   <main class="content">
-    <section class="panel table-panel">
-      <div class="panel-head">
-        <div>
-          <h2>Active Connections</h2>
-          <p>Real-time PPP session monitoring</p>
-        </div>
-        <div class="panel-info" id="onlineSummary">Showing <b id="onlineCount">0</b> connections</div>
+    <header class="topbar glassy">
+      <div class="status-left">
+        <div>Router: <b id="router">-</b></div>
+        <div>Status: <b id="statusText">-</b></div>
       </div>
 
       <div class="status-row">Router: <b id="router">-</b> • Status: <b id="statusText">-</b></div>
@@ -92,10 +81,29 @@
         </table>
       </div>
 
-      <div class="footer-total">Total: <b id="onlineTotalFooter">0</b> sessions</div>
+    <section class="result-box glassy">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>IP</th>
+            <th>MAC</th>
+            <th>Vendor</th>
+            <th>Uptime</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="table">
+          <tr><td colspan="6">Select a router to start...</td></tr>
+        </tbody>
+      </table>
     </section>
 
-    <section class="panel log-box">
+    <div class="result-footer glassy">
+      <span id="onlineSummary">Showing <b id="onlineCount">0</b> of <b id="onlineTotal">0</b> online user</span>
+    </div>
+
+    <section class="log-box glassy">
       <h3>System Log</h3>
       <div id="logPanel" class="log-panel"></div>
     </section>

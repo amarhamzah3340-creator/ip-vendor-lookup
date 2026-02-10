@@ -18,12 +18,9 @@ const namesEl = document.getElementById("names");
 const searchEl = document.getElementById("search");
 const onlineCountEl = document.getElementById("onlineCount");
 const onlineTotalEl = document.getElementById("onlineTotal");
-const offlineCountEl = document.getElementById("offlineCount");
-const onlineTotalFooterEl = document.getElementById("onlineTotalFooter");
 const webCountdownEl = document.getElementById("webCountdown");
 const dbCountdownEl = document.getElementById("dbCountdown");
 const logPanelEl = document.getElementById("logPanel");
-const refreshThemeBtn = document.getElementById("refreshThemeBtn");
 
 let currentRouter = "";
 let lastInput = [];
@@ -104,11 +101,8 @@ function changeRouter() {
     routerEl.innerText = "-";
     statusEl.innerText = "-";
     statusEl.className = "";
-    statusNavTextEl.innerText = "Disconnected";
     onlineCountEl.innerText = "0";
     onlineTotalEl.innerText = "0";
-    onlineTotalFooterEl.innerText = "0";
-    offlineCountEl.innerText = "0";
     return;
   }
 
@@ -207,16 +201,14 @@ function refreshResult() {
 
       let html = "";
       let shownOnline = 0;
-      const totalOnline = rows.length;
-      let offlineShown = 0;
+      let totalOnline = rows.length;
       lastRenderedRows = [];
 
       lastInput.forEach(name => {
         const r = map[name];
         if (!r) {
           if (!lastSearch || name.toLowerCase().includes(lastSearch)) {
-            offlineShown++;
-            html += `<tr class="offline"><td>${name}</td><td>-</td><td>-</td><td>-</td><td>-</td><td><span class="status-pill offline">Disconnected</span></td><td></td></tr>`;
+            html += `<tr class="offline"><td>${name}</td><td colspan="5" class="offline-status">❌ Not connected</td></tr>`;
           }
           return;
         }
@@ -226,7 +218,7 @@ function refreshResult() {
 
         shownOnline++;
         const checked = !!checkedState[name];
-        lastRenderedRows.push({ ...r, name, checked, connected: true });
+        lastRenderedRows.push({ ...r, name, checked });
 
         html += `
           <tr class="${checked ? "checked" : ""}">
@@ -240,11 +232,9 @@ function refreshResult() {
           </tr>`;
       });
 
-      tableEl.innerHTML = html || "<tr><td colspan='7'>No data</td></tr>";
+      tableEl.innerHTML = html || "<tr><td colspan='6'>No data</td></tr>";
       onlineCountEl.innerText = shownOnline;
       onlineTotalEl.innerText = totalOnline;
-      onlineTotalFooterEl.innerText = totalOnline;
-      offlineCountEl.innerText = offlineShown;
       loader(false);
     })
     .catch(() => loader(false));
@@ -348,17 +338,11 @@ function tickCountdown() {
   dbCountdownEl.innerText = dbTick;
 }
 
-refreshThemeBtn?.addEventListener("click", () => {
-  window.dispatchEvent(new CustomEvent("manual-theme-refresh"));
-});
-
 loadRouters();
 loadVendorList();
 loadLogs();
 setInterval(tickCountdown, 1000);
-setInterval(() => {
-  if (currentRouter) loadStatus();
-}, 5000);
+setInterval(() => { if (currentRouter) loadStatus(); }, 5000);
 setInterval(loadRouters, 15000);
 setInterval(loadVendorList, 30000);
 setInterval(loadLogs, 3000);

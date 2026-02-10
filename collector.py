@@ -84,6 +84,7 @@ class RouterCollector:
                     self._last_error = str(exc)
                 self._log(f"Router polling error {self.router.get('ip')}: {exc}", "ERROR")
             finally:
+                # Always disconnect after every polling cycle so stop() doesn't leave hanging connection.
                 self._disconnect()
 
             self._stop_event.wait(self.poll_interval)

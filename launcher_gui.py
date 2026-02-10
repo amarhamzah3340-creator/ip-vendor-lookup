@@ -21,9 +21,9 @@ class MonitorGUI:
 
         self.root = tk.Tk()
         self.root.title("MikroTik PPP Monitor")
-        self.root.geometry("560x280")
-        self.root.minsize(540, 260)
-        self.root.configure(bg="#1d337b")
+        self.root.geometry("520x240")
+        self.root.minsize(480, 220)
+        self.root.configure(bg="#060f3d")
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self.status_var = tk.StringVar(value="Stopped")
@@ -43,43 +43,42 @@ class MonitorGUI:
             sock.close()
 
     def _build_ui(self) -> None:
-        top = tk.Frame(self.root, bg="#2c478f", height=54)
-        top.pack(fill="x")
-        top.pack_propagate(False)
-
-        tk.Label(top, text="📶 MikroTik PPP Monitor", font=("Segoe UI", 15, "bold"), fg="#e9f1ff", bg="#2c478f").pack(side="left", padx=12)
-
-        container = tk.Frame(self.root, bg="#1d337b", padx=16, pady=16)
+        container = tk.Frame(self.root, bg="#060f3d", padx=18, pady=18)
         container.pack(fill="both", expand=True)
 
-        card = tk.Frame(container, bg="#2a418e", highlightbackground="#4f66a9", highlightthickness=1, padx=14, pady=12)
-        card.pack(fill="x")
+        tk.Label(
+            container,
+            text="MikroTik PPP Monitor",
+            font=("Segoe UI", 22, "bold"),
+            fg="#eff4ff",
+            bg="#060f3d",
+            anchor="w",
+        ).pack(fill="x", pady=(0, 10))
 
-        tk.Label(card, text="Launcher Control", font=("Segoe UI", 14, "bold"), fg="#eaf2ff", bg="#2a418e").pack(anchor="w")
+        status_card = tk.Frame(container, bg="#11266f", padx=12, pady=10)
+        status_card.pack(fill="x", pady=(0, 16))
 
-        status_line = tk.Frame(card, bg="#2a418e")
-        status_line.pack(fill="x", pady=(8, 0))
-        tk.Label(status_line, text="Status:", font=("Segoe UI", 11), fg="#cddcff", bg="#2a418e").pack(side="left")
-        self.status_label = tk.Label(status_line, textvariable=self.status_var, font=("Segoe UI", 11, "bold"), fg="#ff90a1", bg="#2a418e")
+        tk.Label(status_card, text="Status:", font=("Segoe UI", 12), fg="#dbe5ff", bg="#11266f").pack(side="left")
+        self.status_label = tk.Label(status_card, textvariable=self.status_var, font=("Segoe UI", 12, "bold"), fg="#f46d7a", bg="#11266f")
         self.status_label.pack(side="left", padx=(8, 20))
 
-        tk.Label(status_line, text="LAN URL:", font=("Segoe UI", 11), fg="#cddcff", bg="#2a418e").pack(side="left")
-        link = tk.Label(status_line, textvariable=self.url_var, font=("Segoe UI", 11, "underline"), fg="#9cc7ff", bg="#2a418e", cursor="hand2")
+        tk.Label(status_card, text="LAN:", font=("Segoe UI", 12), fg="#dbe5ff", bg="#11266f").pack(side="left")
+        link = tk.Label(status_card, textvariable=self.url_var, font=("Segoe UI", 12, "underline"), fg="#66a3ff", bg="#11266f", cursor="hand2")
         link.pack(side="left")
         link.bind("<Button-1>", lambda _e: self.open_browser())
 
-        button_row = tk.Frame(container, bg="#1d337b")
-        button_row.pack(fill="x", pady=(14, 0))
+        button_row = tk.Frame(container, bg="#060f3d")
+        button_row.pack(fill="x")
 
         self.start_btn = tk.Button(
             button_row,
             text="START",
             font=("Segoe UI", 12, "bold"),
-            bg="#3371f1",
+            bg="#4f78ff",
             fg="white",
-            activebackground="#2e62d0",
+            activebackground="#3f66e4",
             relief="flat",
-            padx=22,
+            padx=20,
             pady=10,
             command=self.start_server,
         )
@@ -89,11 +88,11 @@ class MonitorGUI:
             button_row,
             text="STOP",
             font=("Segoe UI", 12, "bold"),
-            bg="#f05d77",
+            bg="#f25f75",
             fg="white",
-            activebackground="#d74e67",
+            activebackground="#e64d65",
             relief="flat",
-            padx=22,
+            padx=20,
             pady=10,
             command=self.stop_server,
             state="disabled",
@@ -104,11 +103,11 @@ class MonitorGUI:
             button_row,
             text="QUIT",
             font=("Segoe UI", 12, "bold"),
-            bg="#3a4f94",
+            bg="#1f2f7a",
             fg="#eff4ff",
-            activebackground="#304585",
+            activebackground="#1a2867",
             relief="flat",
-            padx=22,
+            padx=20,
             pady=10,
             command=self._on_close,
         ).pack(side="left")
@@ -116,12 +115,12 @@ class MonitorGUI:
     def _set_running_ui(self, running: bool) -> None:
         if running:
             self.status_var.set("● Running")
-            self.status_label.configure(fg="#7ef0b5")
+            self.status_label.configure(fg="#66f18a")
             self.start_btn.configure(state="disabled")
             self.stop_btn.configure(state="normal")
         else:
             self.status_var.set("Stopped")
-            self.status_label.configure(fg="#ff90a1")
+            self.status_label.configure(fg="#f46d7a")
             self.start_btn.configure(state="normal")
             self.stop_btn.configure(state="disabled")
 

@@ -4,7 +4,7 @@ from collections import deque
 from datetime import datetime
 from pathlib import Path
 from threading import Lock
-from typing import Callable, Deque, Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from flask import Flask, jsonify, render_template
 
@@ -111,12 +111,6 @@ def get_routers():
 def get_vendors():
     refresh_config()
     return jsonify(sorted({v for v in oui_map.values() if v}))
-
-
-@app.route("/logs")
-def get_logs():
-    with log_lock:
-        return jsonify(list(system_logs))
 
 
 @app.route("/connect/<router_id>", methods=["POST"])

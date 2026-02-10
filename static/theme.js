@@ -1,22 +1,12 @@
 (function () {
   const root = document.documentElement;
-  let hue = 222;
+  let hue = 224;
 
-  function applyTheme() {
-    const primary = `hsl(${hue}, 92%, 60%)`;
-    root.style.setProperty("--button", primary);
+  function pulseTheme() {
+    hue = (hue + 0.25) % 360;
+    const accent = `hsl(${hue}, 88%, 67%)`;
+    root.style.setProperty("--button", accent);
   }
 
-  function pulse() {
-    hue = 220 + Math.sin(Date.now() / 2400) * 6;
-    applyTheme();
-  }
-
-  window.addEventListener("manual-theme-refresh", () => {
-    hue = 216 + Math.random() * 18;
-    applyTheme();
-  });
-
-  setInterval(pulse, 160);
-  applyTheme();
+  setInterval(pulseTheme, 120);
 })();
