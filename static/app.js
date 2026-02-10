@@ -8,6 +8,7 @@ let lastStatusOk = 0;
 
 const loaderEl = document.getElementById("loader");
 const statusEl = document.getElementById("statusText");
+const statusNavTextEl = document.getElementById("statusNavText");
 const vendorInput = document.getElementById("vendor");
 const vendorDropdown = document.getElementById("vendorDropdown");
 const routerSelect = document.getElementById("routerSelect");
@@ -37,6 +38,15 @@ function loader(show) {
 function setDisconnected(text = "DISCONNECTED") {
   statusEl.innerText = text;
   statusEl.className = "down";
+  statusNavTextEl.innerText = "Disconnected";
+  document.querySelector(".router-pill")?.classList.remove("connected");
+}
+
+function setConnected() {
+  statusEl.innerText = "CONNECTED";
+  statusEl.className = "ok";
+  statusNavTextEl.innerText = "Connected";
+  document.querySelector(".router-pill")?.classList.add("connected");
 }
 
 function loadRouters() {
@@ -87,7 +97,7 @@ function changeRouter() {
 
   if (!routerId) {
     currentRouter = "";
-    tableEl.innerHTML = '<tr><td colspan="6">Select a router to start...</td></tr>';
+    tableEl.innerHTML = '<tr><td colspan="7">Select a router to start...</td></tr>';
     routerEl.innerText = "-";
     statusEl.innerText = "-";
     statusEl.className = "";
@@ -128,8 +138,7 @@ function loadStatus() {
 
       if (d.connected) {
         lastStatusOk = now;
-        statusEl.innerText = "CONNECTED";
-        statusEl.className = "ok";
+        setConnected();
         dbTick = DB_REFRESH;
       } else {
         setDisconnected("DISCONNECTED");
@@ -151,6 +160,7 @@ function loadSecrets() {
     .then(list => {
       namesEl.value = list.join("\n");
       loader(false);
+      processInput();
     })
     .catch(() => loader(false));
 }
@@ -185,7 +195,9 @@ function refreshResult() {
     .then(rows => {
       updateVendorCache(rows);
       const map = {};
-      rows.forEach(r => map[r.name] = r);
+      rows.forEach(r => {
+        map[r.name] = r;
+      });
 
       let html = "";
       let shownOnline = 0;
@@ -215,6 +227,7 @@ function refreshResult() {
             <td>${r.mac}</td>
             <td>${r.vendor}</td>
             <td>${r.uptime}</td>
+            <td><span class="status-pill online">Connected</span></td>
             <td><input type="checkbox" data-name="${name}" ${checked ? "checked" : ""}></td>
           </tr>`;
       });
@@ -290,10 +303,10 @@ document.addEventListener("click", e => {
 function exportCSV(checkedOnly) {
   if (!lastRenderedRows.length) return;
 
-  const csv = ["Name,IP,MAC,Vendor,Uptime,Checked"];
+  const csv = ["Name,IP,MAC,Vendor,Uptime,Connected,Checked"];
   lastRenderedRows.forEach(r => {
     if (checkedOnly && !r.checked) return;
-    csv.push([r.name, r.ip, r.mac, r.vendor, r.uptime, r.checked].join(","));
+    csv.push([r.name, r.ip, r.mac, r.vendor, r.uptime, r.connected, r.checked].join(","));
   });
 
   const blob = new Blob([csv.join("\n")], { type: "text/csv" });
