@@ -1,5 +1,7 @@
 import atexit
 from argparse import ArgumentParser
+from collections import deque
+from datetime import datetime
 from pathlib import Path
 from threading import Lock
 from typing import Callable, Dict, List, Optional
@@ -12,6 +14,7 @@ app = Flask(__name__)
 
 collector_lock = Lock()
 config_lock = Lock()
+log_lock = Lock()
 active_router_id = None
 active_collector = None
 
@@ -24,10 +27,21 @@ config_path = "config.json"
 _last_config_mtime: Optional[float] = None
 _last_oui_mtime: Optional[float] = None
 
+MAX_LOG_LINES = 500
+system_logs: Deque[Dict[str, str]] = deque(maxlen=MAX_LOG_LINES)
+
 _log_callback: Optional[Callable[[str, str], None]] = None
 
 
 def log(message: str, level: str = "INFO") -> None:
+    entry = {
+        "time": datetime.now().strftime("%H:%M:%S"),
+        "level": level,
+        "message": str(message),
+    }
+    with log_lock:
+        system_logs.append(entry)
+
     if _log_callback:
         _log_callback(message, level)
 
@@ -144,10 +158,7 @@ def secrets(router_id):
     refresh_config()
     if router_id != active_router_id or active_collector is None:
         return jsonify([])
-
-    rows = active_collector.get_data()
-    names = sorted({r.get("name", "") for r in rows if r.get("name")})
-    return jsonify(names)
+    return jsonify(active_collector.get_secrets())
 
 
 if __name__ == "__main__":
