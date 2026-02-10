@@ -19,6 +19,7 @@ class MonitorGUI:
         self._server = None
         self._server_thread = None
         self._web_module = None
+        self._starting = False
 
         self.root = tk.Tk()
         self.root.title("MikroTik PPP Monitor")
@@ -124,40 +125,56 @@ class MonitorGUI:
             self.start_btn.configure(state="normal")
             self.stop_btn.configure(state="disabled")
 
+    def _set_starting_ui(self) -> None:
+        self.status_var.set("Starting...")
+        self.status_label.configure(fg="#ffd166")
+        self.start_btn.configure(state="disabled")
+        self.stop_btn.configure(state="disabled")
+
     def start_server(self) -> None:
         if self._server is not None:
             self._append_log("Server already running")
             return
-
-        try:
-            import web as web_module
-        except Exception as exc:
-            self._append_log(f"Failed to import web server deps: {exc}", "ERROR")
+        if self._starting:
+            self._append_log("Server startup already in progress")
             return
 
-        self._web_module = web_module
-        if hasattr(self._web_module, "set_log_callback"):
-            self._web_module.set_log_callback(self._append_log_threadsafe)
-
+        self._starting = True
+        self._set_starting_ui()
         self._append_log(f"Starting embedded server on localhost {self.local_url} and LAN {self.lan_url}")
+        threading.Thread(target=self._start_server_background, daemon=True).start()
 
-        class GuiRequestHandler(WSGIRequestHandler):
-            def log_message(handler_self, fmt: str, *args) -> None:  # noqa: N805
-                self._append_log_threadsafe(fmt % args, "WEB")
+    def _start_server_background(self) -> None:
+        try:
+            import web as web_module
+
+            self._web_module = web_module
+            if hasattr(self._web_module, "set_log_callback"):
+                self._web_module.set_log_callback(self._append_log_threadsafe)
+
+            class GuiRequestHandler(WSGIRequestHandler):
+                def log_message(handler_self, fmt: str, *args) -> None:  # noqa: N805
+                    self._append_log_threadsafe(fmt % args, "WEB")
+
+            server = make_server("0.0.0.0", self.port, web_module.app, handler_class=GuiRequestHandler)
+            server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+            server_thread.start()
 
         try:
             self._server = make_server("0.0.0.0", self.port, web_module.app, handler_class=GuiRequestHandler)
         except Exception as exc:
-            self._append_log(f"Failed starting server: {exc}", "ERROR")
-            self._server = None
-            return
+            self.root.after(0, self._on_server_start_failed, str(exc))
 
-        self._server_thread = threading.Thread(target=self._server.serve_forever, daemon=True)
-        self._server_thread.start()
+    def _on_server_started(self) -> None:
+        self._starting = False
         self._set_running_ui(True)
-
         if self.auto_open_var.get():
             threading.Thread(target=self._open_browser_when_ready, daemon=True).start()
+
+    def _on_server_start_failed(self, error_text: str) -> None:
+        self._starting = False
+        self._set_running_ui(False)
+        self._append_log(f"Failed starting server: {error_text}", "ERROR")
 
     def _open_browser_when_ready(self) -> None:
         if self._wait_server_ready(timeout=12):
@@ -178,6 +195,10 @@ class MonitorGUI:
         return False
 
     def stop_server(self) -> None:
+        if self._starting and self._server is None:
+            self._append_log("Server is still starting. Please wait...", "WARN")
+            return
+
         if self._server is None:
             self._append_log("Server is not running")
             self._set_running_ui(False)
