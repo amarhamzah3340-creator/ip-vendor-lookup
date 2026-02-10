@@ -61,6 +61,28 @@ class RouterCollector:
         with self._lock:
             return list(self._data)
 
+
+    def get_secret_names(self) -> List[str]:
+        api_pool = RouterOsApiPool(
+            self.router["ip"],
+            username=self.router["username"],
+            password=self.router["password"],
+            port=self.router.get("port", 8274),
+            plaintext_login=True,
+        )
+
+        try:
+            api = api_pool.get_api()
+            resource = api.get_resource("/ppp/secret")
+            names = sorted({item.get("name", "").strip() for item in resource.get() if item.get("name", "").strip()})
+            self._log(f"Fetched {len(names)} PPP secret names from {self.router.get('ip')}")
+            return names
+        finally:
+            try:
+                api_pool.disconnect()
+            except Exception:
+                pass
+
     def _run(self) -> None:
         while not self._stop_event.is_set():
             try:
