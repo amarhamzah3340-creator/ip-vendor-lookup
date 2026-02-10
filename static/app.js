@@ -6,7 +6,6 @@ let webTick = WEB_REFRESH;
 let dbTick = DB_REFRESH;
 let lastStatusOk = 0;
 
-/* ===== ELEMENTS ===== */
 const loaderEl = document.getElementById("loader");
 const statusEl = document.getElementById("statusText");
 const vendorInput = document.getElementById("vendor");
@@ -17,10 +16,11 @@ const routerEl = document.getElementById("router");
 const namesEl = document.getElementById("names");
 const searchEl = document.getElementById("search");
 const onlineCountEl = document.getElementById("onlineCount");
+const onlineTotalEl = document.getElementById("onlineTotal");
 const webCountdownEl = document.getElementById("webCountdown");
 const dbCountdownEl = document.getElementById("dbCountdown");
+const logPanelEl = document.getElementById("logPanel");
 
-/* ===== STATE ===== */
 let currentRouter = "";
 let lastInput = [];
 let lastVendor = "";
@@ -30,7 +30,6 @@ let checkedState = {};
 let lastRenderedRows = [];
 let vendorCache = new Set();
 
-/* ===== LOADER ===== */
 function loader(show) {
   loaderEl.classList.toggle("hidden", !show);
 }
@@ -40,7 +39,6 @@ function setDisconnected(text = "DISCONNECTED") {
   statusEl.className = "down";
 }
 
-/* ===== LOAD ROUTERS LIST (DYNAMIC) ===== */
 function loadRouters() {
   const selected = routerSelect.value;
 
@@ -59,24 +57,31 @@ function loadRouters() {
         routerSelect.value = selected;
       }
     })
-    .catch(err => {
-      console.error("Failed to load routers:", err);
-    });
+    .catch(err => console.error("Failed to load routers:", err));
 }
 
-/* ===== LOAD VENDOR LIST FROM OUI ===== */
 function loadVendorList() {
   fetch("/vendors")
     .then(r => r.json())
-    .then(vendors => {
-      vendors.forEach(v => vendorCache.add(v));
-    })
-    .catch(err => {
-      console.error("Failed to load vendors:", err);
-    });
+    .then(vendors => vendors.forEach(v => vendorCache.add(v)))
+    .catch(err => console.error("Failed to load vendors:", err));
 }
 
-/* ===== CHANGE ROUTER ===== */
+function loadLogs() {
+  fetch("/logs")
+    .then(r => r.json())
+    .then(rows => {
+      let html = "";
+      rows.slice(-200).forEach(row => {
+        const level = (row.level || "INFO").toLowerCase();
+        html += `<div class="log-entry ${level}"><span class="t">[${row.time}]</span><span class="lvl">${row.level}</span>${row.message}</div>`;
+      });
+      logPanelEl.innerHTML = html || '<div class="log-entry info">No logs yet.</div>';
+      logPanelEl.scrollTop = logPanelEl.scrollHeight;
+    })
+    .catch(() => {});
+}
+
 function changeRouter() {
   const routerId = routerSelect.value;
 
@@ -86,6 +91,8 @@ function changeRouter() {
     routerEl.innerText = "-";
     statusEl.innerText = "-";
     statusEl.className = "";
+    onlineCountEl.innerText = "0";
+    onlineTotalEl.innerText = "0";
     return;
   }
 
@@ -110,7 +117,6 @@ function changeRouter() {
     });
 }
 
-/* ===== STATUS ===== */
 function loadStatus() {
   if (!currentRouter) return;
 
@@ -127,17 +133,12 @@ function loadStatus() {
         dbTick = DB_REFRESH;
       } else {
         setDisconnected("DISCONNECTED");
-        if (d.last_error) {
-          statusEl.title = d.last_error;
-        }
+        if (d.last_error) statusEl.title = d.last_error;
       }
     })
-    .catch(() => {
-      setDisconnected("DISCONNECTED");
-    });
+    .catch(() => setDisconnected("DISCONNECTED"));
 }
 
-/* ===== SECRETS ===== */
 function loadSecrets() {
   if (!currentRouter) {
     alert("Please select a router first");
@@ -151,12 +152,9 @@ function loadSecrets() {
       namesEl.value = list.join("\n");
       loader(false);
     })
-    .catch(() => {
-      loader(false);
-    });
+    .catch(() => loader(false));
 }
 
-/* ===== PROCESS ===== */
 function processInput() {
   if (!currentRouter) {
     alert("Please select a router first");
@@ -178,37 +176,39 @@ function updateVendorCache(rows) {
   });
 }
 
-/* ===== REFRESH RESULT ===== */
 function refreshResult() {
   if (!hasProcessed || !currentRouter) return;
 
   loader(true);
-
   fetch(`/data/${currentRouter}`)
     .then(r => r.json())
     .then(rows => {
       updateVendorCache(rows);
-
       const map = {};
       rows.forEach(r => map[r.name] = r);
 
       let html = "";
-      let online = 0;
+      let shownOnline = 0;
+      let totalOnline = rows.length;
       lastRenderedRows = [];
 
       lastInput.forEach(name => {
+        const r = map[name];
+        if (!r) {
+          if (!lastSearch || name.toLowerCase().includes(lastSearch)) {
+            html += `<tr class="offline"><td>${name}</td><td colspan="5" class="offline-status">❌ Not connected</td></tr>`;
+          }
+          return;
+        }
+
+        if (lastVendor && !r.vendor.toLowerCase().includes(lastVendor)) return;
         if (lastSearch && !name.toLowerCase().includes(lastSearch)) return;
 
-        const r = map[name];
-        if (r) {
-          if (lastVendor && !r.vendor.toLowerCase().includes(lastVendor)) return;
+        shownOnline++;
+        const checked = !!checkedState[name];
+        lastRenderedRows.push({ ...r, name, checked });
 
-          online++;
-          const checked = !!checkedState[name];
-
-          lastRenderedRows.push({ ...r, name, checked });
-
-          html += `
+        html += `
           <tr class="${checked ? "checked" : ""}">
             <td>${name}</td>
             <td><a href="http://${r.ip}" target="_blank">${r.ip}</a></td>
@@ -217,21 +217,16 @@ function refreshResult() {
             <td>${r.uptime}</td>
             <td><input type="checkbox" data-name="${name}" ${checked ? "checked" : ""}></td>
           </tr>`;
-        } else {
-          html += `<tr class="offline"><td>${name}</td><td colspan="5" class="offline-status">❌ Not found in active connection</td></tr>`;
-        }
       });
 
       tableEl.innerHTML = html || "<tr><td colspan='6'>No data</td></tr>";
-      onlineCountEl.innerText = online;
+      onlineCountEl.innerText = shownOnline;
+      onlineTotalEl.innerText = totalOnline;
       loader(false);
     })
-    .catch(() => {
-      loader(false);
-    });
+    .catch(() => loader(false));
 }
 
-/* ===== CHECKBOX ===== */
 tableEl.addEventListener("change", e => {
   if (e.target.type === "checkbox") {
     const name = e.target.dataset.name;
@@ -240,9 +235,7 @@ tableEl.addEventListener("change", e => {
   }
 });
 
-/* ===== VENDOR AUTOSUGGEST ===== */
 let activeIndex = -1;
-
 vendorInput.addEventListener("input", () => {
   const val = vendorInput.value.toLowerCase();
   vendorDropdown.innerHTML = "";
@@ -291,12 +284,9 @@ vendorInput.addEventListener("keydown", e => {
 });
 
 document.addEventListener("click", e => {
-  if (!e.target.closest(".vendor-wrap")) {
-    vendorDropdown.classList.add("hidden");
-  }
+  if (!e.target.closest(".vendor-wrap")) vendorDropdown.classList.add("hidden");
 });
 
-/* ===== EXPORT CSV ===== */
 function exportCSV(checkedOnly) {
   if (!lastRenderedRows.length) return;
 
@@ -315,7 +305,6 @@ function exportCSV(checkedOnly) {
   URL.revokeObjectURL(url);
 }
 
-/* ===== COUNTDOWN ===== */
 function tickCountdown() {
   if (!currentRouter) return;
 
@@ -323,9 +312,7 @@ function tickCountdown() {
   dbTick--;
 
   const now = Date.now() / 1000;
-  if (lastStatusOk && now - lastStatusOk > STATUS_TIMEOUT) {
-    setDisconnected("DISCONNECTED");
-  }
+  if (lastStatusOk && now - lastStatusOk > STATUS_TIMEOUT) setDisconnected("DISCONNECTED");
 
   if (webTick <= 0) {
     webTick = WEB_REFRESH;
@@ -338,12 +325,11 @@ function tickCountdown() {
   dbCountdownEl.innerText = dbTick;
 }
 
-/* ===== INIT ===== */
 loadRouters();
 loadVendorList();
+loadLogs();
 setInterval(tickCountdown, 1000);
-setInterval(() => {
-  if (currentRouter) loadStatus();
-}, 5000);
+setInterval(() => { if (currentRouter) loadStatus(); }, 5000);
 setInterval(loadRouters, 15000);
 setInterval(loadVendorList, 30000);
+setInterval(loadLogs, 3000);
