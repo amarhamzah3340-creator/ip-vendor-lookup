@@ -25,15 +25,12 @@ def _load_from_file(file_path: Path, module_name: str):
 
 
 def _load_monitor_gui_class():
-    # 1) Normal module imports
-    for module_name in ("gui", "launcher_gui"):
+    for module_name in ("launcher_gui", "gui"):
         monitor_gui = _load_from_module(module_name)
         if monitor_gui is not None:
             return monitor_gui
 
-    # 2) File-based fallbacks for packaged/runtime variants
     search_roots = []
-
     meipass = getattr(sys, "_MEIPASS", None)
     if meipass:
         search_roots.append(Path(meipass))
@@ -43,77 +40,13 @@ def _load_monitor_gui_class():
 
     module_counter = 0
     for root in search_roots:
-        for filename in ("gui.py", "launcher_gui.py"):
+        for filename in ("launcher_gui.py", "gui.py"):
             monitor_gui = _load_from_file(root / filename, f"launcher_fallback_{module_counter}")
             module_counter += 1
             if monitor_gui is not None:
                 return monitor_gui
 
-    raise ModuleNotFoundError("No module named 'gui' or 'launcher_gui' at runtime")
-def _load_monitor_gui_class():
-    try:
-        from gui import MonitorGUI
-        return MonitorGUI
-    except ModuleNotFoundError:
-        pass
-
-    try:
-        from launcher_gui import MonitorGUI
-        return MonitorGUI
-    except ModuleNotFoundError:
-        pass
-
-    candidates = []
-    meipass = getattr(sys, "_MEIPASS", None)
-    if meipass:
-        candidates.append(Path(meipass) / "gui.py")
-        candidates.append(Path(meipass) / "launcher_gui.py")
-
-    candidates.append(Path(__file__).resolve().with_name("gui.py"))
-    candidates.append(Path(__file__).resolve().with_name("launcher_gui.py"))
-    candidates.append(Path(sys.executable).resolve().parent / "gui.py")
-    candidates.append(Path(sys.executable).resolve().parent / "launcher_gui.py")
-
-    for module_name, gui_path in [("gui", c) for c in candidates]:
-        if not gui_path.exists():
-            continue
-
-        spec = importlib.util.spec_from_file_location(module_name, gui_path)
-        if not spec or not spec.loader:
-            continue
-
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        if hasattr(module, "MonitorGUI"):
-            return module.MonitorGUI
-
-    raise ModuleNotFoundError("No module named 'gui' or 'launcher_gui' at runtime")
-
-        return MonitorGUI
-    except ModuleNotFoundError:
-        candidates = []
-
-        meipass = getattr(sys, "_MEIPASS", None)
-        if meipass:
-            candidates.append(Path(meipass) / "gui.py")
-
-        candidates.append(Path(__file__).resolve().with_name("gui.py"))
-        candidates.append(Path(sys.executable).resolve().parent / "gui.py")
-
-        for gui_path in candidates:
-            if not gui_path.exists():
-                continue
-
-            spec = importlib.util.spec_from_file_location("gui", gui_path)
-            if not spec or not spec.loader:
-                continue
-
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            if hasattr(module, "MonitorGUI"):
-                return module.MonitorGUI
-
-        raise
+    raise ModuleNotFoundError("No module named 'launcher_gui' or 'gui' at runtime")
 
 
 if __name__ == "__main__":

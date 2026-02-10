@@ -3,7 +3,6 @@ import sys
 import threading
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
-from typing import Dict, List, Optional, Tuple
 
 from routeros_api import RouterOsApiPool
 
@@ -20,10 +19,6 @@ class RouterCollector:
         self.poll_interval = poll_interval
         self.oui_map = oui_map or {}
         self.log_callback = log_callback
-    def __init__(self, router: Dict, poll_interval: int = 30, oui_map: Optional[Dict[str, str]] = None):
-        self.router = router
-        self.poll_interval = poll_interval
-        self.oui_map = oui_map or {}
 
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
@@ -82,8 +77,6 @@ class RouterCollector:
                     self._last_error = str(exc)
                 self._log(f"Router polling error {self.router.get('ip')}: {exc}", "ERROR")
             finally:
-            finally:
-                # Always disconnect after every polling cycle so stop() doesn't leave hanging connection.
                 self._disconnect()
 
             self._stop_event.wait(self.poll_interval)
@@ -97,9 +90,6 @@ class RouterCollector:
             plaintext_login=True,
         )
         self._log(f"Connected API {self.router.get('ip')}:{self.router.get('port', 8274)}")
-            port=self.router.get("port", 1080),
-            plaintext_login=True,
-        )
 
     def _fetch_ppp_active(self) -> List[Dict]:
         if not self._api_pool:
@@ -177,7 +167,6 @@ def load_oui(oui_file: str) -> Dict[str, str]:
 
 
 def load_routers(config_file: str = "config.json") -> Tuple[List[Dict], int, str, str]:
-def load_routers(config_file: str = "config.json") -> Tuple[List[Dict], int, str]:
     config_path = _resolve_path(config_file)
     with config_path.open("r", encoding="utf-8") as fh:
         cfg = json.load(fh)
@@ -185,4 +174,3 @@ def load_routers(config_file: str = "config.json") -> Tuple[List[Dict], int, str
     oui_value = cfg.get("oui_file", "oui.txt")
     oui_path = _resolve_path(oui_value, base_dir=config_path.parent)
     return cfg.get("routers", []), cfg.get("poll_interval", 30), str(oui_path), str(config_path)
-    return cfg.get("routers", []), cfg.get("poll_interval", 30), str(oui_path)
