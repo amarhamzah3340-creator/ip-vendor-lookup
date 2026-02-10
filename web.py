@@ -145,9 +145,11 @@ def secrets(router_id):
     if router_id != active_router_id or active_collector is None:
         return jsonify([])
 
-    rows = active_collector.get_data()
-    names = sorted({r.get("name", "") for r in rows if r.get("name")})
-    return jsonify(names)
+    try:
+        return jsonify(active_collector.get_secret_names())
+    except Exception as exc:
+        log(f"Failed loading PPP secret from router {router_id}: {exc}", "ERROR")
+        return jsonify([])
 
 
 if __name__ == "__main__":

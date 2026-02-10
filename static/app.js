@@ -17,6 +17,7 @@ const routerEl = document.getElementById("router");
 const namesEl = document.getElementById("names");
 const searchEl = document.getElementById("search");
 const onlineCountEl = document.getElementById("onlineCount");
+const activeCountEl = document.getElementById("activeCount");
 const webCountdownEl = document.getElementById("webCountdown");
 const dbCountdownEl = document.getElementById("dbCountdown");
 
@@ -86,6 +87,8 @@ function changeRouter() {
     routerEl.innerText = "-";
     statusEl.innerText = "-";
     statusEl.className = "";
+    onlineCountEl.innerText = "0";
+    activeCountEl.innerText = "0";
     return;
   }
 
@@ -193,7 +196,7 @@ function refreshResult() {
       rows.forEach(r => map[r.name] = r);
 
       let html = "";
-      let online = 0;
+      let shownFromActive = 0;
       lastRenderedRows = [];
 
       lastInput.forEach(name => {
@@ -203,7 +206,7 @@ function refreshResult() {
         if (r) {
           if (lastVendor && !r.vendor.toLowerCase().includes(lastVendor)) return;
 
-          online++;
+          shownFromActive++;
           const checked = !!checkedState[name];
 
           lastRenderedRows.push({ ...r, name, checked });
@@ -218,12 +221,21 @@ function refreshResult() {
             <td><input type="checkbox" data-name="${name}" ${checked ? "checked" : ""}></td>
           </tr>`;
         } else {
-          html += `<tr class="offline"><td>${name}</td><td colspan="5" class="offline-status">❌ Not found in active connection</td></tr>`;
+          html += `
+          <tr class="offline">
+            <td>${name}</td>
+            <td class="offline-status">Not Connected</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td></td>
+          </tr>`;
         }
       });
 
       tableEl.innerHTML = html || "<tr><td colspan='6'>No data</td></tr>";
-      onlineCountEl.innerText = online;
+      onlineCountEl.innerText = shownFromActive;
+      activeCountEl.innerText = rows.length;
       loader(false);
     })
     .catch(() => {
